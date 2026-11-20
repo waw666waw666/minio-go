@@ -20,6 +20,7 @@ package minio
 import (
 	"fmt"
 	"testing"
+	"time"
 )
 
 func TestSetHeader(t *testing.T) {
@@ -97,5 +98,39 @@ func TestCustomQueryParameters(t *testing.T) {
 		} else if v[0] != paramValue {
 			t.Errorf("Test %d: Expected query value %s for key %s, got %s", i+1, paramValue, paramKey, v[0])
 		}
+	}
+}
+
+func TestSetModifiedFormatsUTC(t *testing.T) {
+	// http.TimeFormat uses a literal "GMT" suffix and requires a UTC time.
+	// A non-UTC location must not be formatted as a local wall clock with GMT.
+	loc := time.FixedZone("IST", 5*60*60+30*60)
+	modTime := time.Date(2026, 10, 26, 12, 0, 0, 0, loc) // 06:30 UTC
+	want := "Mon, 26 Oct 2026 06:30:00 GMT"
+
+	var opts GetObjectOptions
+	if err := opts.SetModified(modTime); err != nil {
+		t.Fatalf("SetModified: %v", err)
+	}
+	if got := opts.Header().Get("If-Modified-Since"); got != want {
+		t.Errorf("If-Modified-Since = %q, want %q", got, want)
+	}
+
+	opts = GetObjectOptions{}
+	if err := opts.SetUnmodified(modTime); err != nil {
+		t.Fatalf("SetUnmodified: %v", err)
+	}
+	if got := opts.Header().Get("If-Unmodified-Since"); got != want {
+		t.Errorf("If-Unmodified-Since = %q, want %q", got, want)
+	}
+
+	// Already-UTC values must keep the same instant.
+	utc := time.Date(2026, 10, 26, 6, 30, 0, 0, time.UTC)
+	opts = GetObjectOptions{}
+	if err := opts.SetModified(utc); err != nil {
+		t.Fatalf("SetModified(UTC): %v", err)
+	}
+	if got := opts.Header().Get("If-Modified-Since"); got != want {
+		t.Errorf("If-Modified-Since (UTC input) = %q, want %q", got, want)
 	}
 }

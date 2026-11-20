@@ -314,3 +314,24 @@ func TestComposeObjectParallelPartFailure(t *testing.T) {
 		t.Errorf("expected remaining parts to be canceled, but all %d were copied", s.copied)
 	}
 }
+
+func TestCopySrcOptionsModifiedSinceFormatsUTC(t *testing.T) {
+	loc := time.FixedZone("IST", 5*60*60+30*60)
+	modTime := time.Date(2026, 10, 26, 12, 0, 0, 0, loc) // 06:30 UTC
+	want := "Mon, 26 Oct 2026 06:30:00 GMT"
+
+	header := make(http.Header)
+	opts := CopySrcOptions{
+		Bucket:               "bucket",
+		Object:               "object",
+		MatchModifiedSince:   modTime,
+		MatchUnmodifiedSince: modTime,
+	}
+	opts.Marshal(header)
+	if got := header.Get("x-amz-copy-source-if-modified-since"); got != want {
+		t.Errorf("x-amz-copy-source-if-modified-since = %q, want %q", got, want)
+	}
+	if got := header.Get("x-amz-copy-source-if-unmodified-since"); got != want {
+		t.Errorf("x-amz-copy-source-if-unmodified-since = %q, want %q", got, want)
+	}
+}
